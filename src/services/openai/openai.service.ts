@@ -76,7 +76,7 @@ export class OpenaiService {
         },
         { role: 'user', content: prompt },
       ],
-      temperature: 0.1, // Baixa temperatura para resultados melhores
+      temperature: 0.1, // baixa temperatura para resultados melhores
       response_format: { type: 'json_object' },
     });
 
@@ -85,5 +85,63 @@ export class OpenaiService {
       code: result.code,
       newDependencies: result.newDependencies || [],
     };
+  }
+
+  async updatePomDependencies(
+    pomXml: string,
+    projectDependencies: any[],
+  ): Promise<string> {
+    const prompt = `
+	# Atualização de Dependências Maven
+	
+	## pom.xml original
+	\`\`\`xml
+	${pomXml}
+	\`\`\`
+	
+	## Dependências do projeto original
+	${JSON.stringify(projectDependencies, null, 2)}
+	
+	## Tarefa
+	Atualize o arquivo pom.xml acima para incluir todas as dependências necessárias do projeto original,
+	mas usando versões compatíveis com Spring Boot 3.x e Java 21.
+	
+	Diretrizes:
+	1. Mantenha todas as dependências Spring Boot existentes
+	2. Adicione equivalentes modernos para as dependências do projeto original
+	3. Remova dependências duplicadas ou conflitantes
+	4. Atualize as versões para que sejam compatíveis com Spring Boot 3.x
+	5. Adicione comentários explicativos quando necessário
+	
+	Por favor, forneça apenas o arquivo pom.xml atualizado sem explicações adicionais.`;
+
+    const systemPrompt = `
+	Você é um especialista em configuração Maven e dependências Java. 
+	Seu trabalho é atualizar arquivos pom.xml para projetos Spring Boot modernos.`;
+
+    const response = await this.openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: systemPrompt,
+        },
+        { role: 'user', content: prompt },
+      ],
+      temperature: 0.1, // temperatura baixa para maior assertividade
+    });
+
+    let pomAtualizado = response.choices[0].message.content?.trim() || '';
+
+    // garantir que os blocos markdown não existam
+    if (pomAtualizado?.startsWith('```xml')) {
+      pomAtualizado = pomAtualizado.replace(/```xml\n/, '').replace(/```$/, '');
+    }
+
+    if (pomAtualizado?.startsWith('```')) {
+      pomAtualizado = pomAtualizado.replace(/```\n/, '').replace(/```$/, '');
+    }
+
+    return pomAtualizado;
   }
 }
