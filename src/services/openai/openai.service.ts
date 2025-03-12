@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import OpenAI from 'openai';
-import { ProjectDependenciesResponse } from 'src/dtos/project-dependencies.response';
+import { Dependency } from 'src/types/dependecy';
+import { CodeMigrationResult } from 'src/types/migration-result';
+import { ProjectDependenciesResponse } from 'src/types/project-dependencies.response';
 
 @Injectable()
 export class OpenaiService {
@@ -14,8 +16,8 @@ export class OpenaiService {
     sourceCode: string,
     filePath: string,
     targetJavaVersion: string,
-    projectDependencies: ProjectDependenciesResponse[] = [],
-  ): Promise<{ code: string; newDependencies: ProjectDependenciesResponse[] }> {
+    projectDependencies: Dependency[] = [],
+  ): Promise<CodeMigrationResult> {
     const fileName = filePath.split(/[\/\\]/).pop();
 
     const prompt = `
@@ -80,11 +82,22 @@ export class OpenaiService {
       response_format: { type: 'json_object' },
     });
 
-    const result = JSON.parse(response.choices[0].message.content || '');
-    return {
-      code: result.code,
-      newDependencies: result.newDependencies || [],
-    };
+    try {
+      const result = JSON.parse(
+        response.choices[0].message.content || '',
+      ) as CodeMigrationResult;
+      return {
+        code: result.code,
+        newDependencies: result.newDependencies || [],
+      };
+    } catch (error) {
+      console.error('Erro ao parsear resposta JSON:', error);
+
+      return {
+        code: response.choices[0].message.content || '',
+        newDependencies: [],
+      };
+    }
   }
 
   async updatePomDependencies(
